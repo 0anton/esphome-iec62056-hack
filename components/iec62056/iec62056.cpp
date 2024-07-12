@@ -692,7 +692,8 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
     return false;
   }
 
-  out_obis.assign(line, open_bracket - line);
+  // out_obis.assign(line, open_bracket - line);
+  out_obis.assign(line, "1-0:15.8.0");
   out_value1.assign(open_bracket + 1, close_bracket - open_bracket - 1);
 
   if (!(!open_bracket2 || !close_bracket2 || close_bracket2 < open_bracket2)) {
