@@ -264,7 +264,7 @@ void IEC62056Component::loop() {
   static uint32_t new_baudrate;
 
   const uint8_t id_request[5] = {'/', '?', '!', '\r', '\n'};
-  const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x30, 0x0d, 0x0a};
+  const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
   const uint32_t now = millis();
 
   size_t frame_size;
@@ -692,8 +692,7 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
     return false;
   }
 
-  // out_obis.assign(line, open_bracket - line);
-  out_obis.assign(line, "1-0:15.8.0");
+  out_obis.assign(line, open_bracket - line);
   out_value1.assign(open_bracket + 1, close_bracket - open_bracket - 1);
 
   if (!(!open_bracket2 || !close_bracket2 || close_bracket2 < open_bracket2)) {
