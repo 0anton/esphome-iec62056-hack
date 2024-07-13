@@ -484,13 +484,26 @@ void IEC62056Component::loop() {
       if (receive_frame_() >= 1) {
         if (PPP == in_buf_[0]) {
           ESP_LOGD(TAG, "Meter asks for password");
-          set_next_state_(SEND_PASSWORD);
+          set_next_state_(WAIT_FOR_PPP_READ_DATA);
         } else {
           ESP_LOGD(TAG, "No PPP. Got 0x%02x", in_buf_[0]);
           retry_or_sleep_();
         }
       }
       break;
+
+    case WAIT_FOR_PPP_READ_DATA:
+      report_state_();
+      if (receive_frame_() >= 1) {
+        if ('(' == in_buf_[0]) {
+        ESP_LOGD(TAG, "Meter asks for password (data)");
+        set_next_state_(SEND_PASSWORD);
+      } else {
+        ESP_LOGD(TAG, "No data. Got 0x%02x", in_buf_[0]);
+        retry_or_sleep_();
+      }
+    }
+    break;
 
     case SEND_PASSWORD:
        report_state_();
@@ -814,6 +827,9 @@ const char *IEC62056Component::state2txt_(CommState state) {
 
     case MODE_D_READOUT:
       return "MODE_D_READOUT";
+
+    case WAIT_FOR_PPP_READ_DATA:
+      return "WAIT_FOR_PPP_READ_DATA";
 
     default:
       return "UNKNOWN";
