@@ -516,7 +516,7 @@ void IEC62056Component::loop() {
     case WAIT_FOR_ACK:
       report_state_();
 
-      receive_frame_()
+      receive_frame_();
       if (receive_frame_() >= 1) {
         if (ACK == in_buf_[0]) {
           ESP_LOGD(TAG, "Meter accepted password");
