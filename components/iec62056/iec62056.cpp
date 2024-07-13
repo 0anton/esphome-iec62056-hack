@@ -12,6 +12,7 @@ namespace iec62056 {
 static const uint8_t ETX = 0x03;
 static const uint8_t STX = 0x02;
 static const uint8_t ACK = 0x06;
+static const uint8_t PPP = 0x01;
 
 static const char *const TAG = "iec62056.component";
 const uint32_t BAUDRATES[] = {300, 600, 1200, 2400, 4800, 9600, 19200};
@@ -474,9 +475,23 @@ void IEC62056Component::loop() {
     case SET_BAUD_RATE:
       ESP_LOGD(TAG, "Switching to new baud rate %u bps ('%c')", new_baudrate, baud_rate_char);
       update_baudrate_(new_baudrate);
-      set_next_state_(WAIT_FOR_STX);
+      set_next_state_(WAIT_FOR_PPP);
       break;
 
+    case WAIT_FOR_PPP:
+      report_state_();
+      if (receive_frame_() >= 1) {
+        if (PPP == in_buf_[0]) {
+          ESP_LOGD(TAG, "Meter asks for password");
+          set_next_state_(SEND_PASSWORD);
+        } else {
+          ESP_LOGD(TAG, "No PPP. Got 0x%02x", in_buf_[0]);
+          retry_or_sleep_();
+        }
+      }
+      break;
+
+    
     case WAIT_FOR_STX:  // wait for STX
       report_state_();
 
@@ -752,6 +767,9 @@ const char *IEC62056Component::state2txt_(CommState state) {
     case WAIT_FOR_STX:
       return "WAIT_FOR_STX";
 
+    case WAIT_FOR_PPP:
+      return "WAIT_FOR_PPP";
+    
     case READOUT:
       return "READOUT";
 
