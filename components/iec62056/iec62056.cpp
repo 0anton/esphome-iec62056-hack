@@ -497,6 +497,7 @@ void IEC62056Component::loop() {
        data_out_size_ = sizeof(set_password);
        memcpy(out_buf_, set_password, data_out_size_);
        send_frame_();
+       set_next_state_(WAIT_FOR_ACK);
     break;
 
     case WAIT_FOR_ACK:
@@ -789,6 +790,9 @@ const char *IEC62056Component::state2txt_(CommState state) {
 
     case WAIT_FOR_ACK:
       return "WAIT_FOR_ACK";
+
+    case SEND_PASSWORD:
+      return "SEND_PASSWORD";
 
     case WAIT_FOR_STX:
       return "WAIT_FOR_STX";
