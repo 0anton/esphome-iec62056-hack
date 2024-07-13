@@ -484,7 +484,7 @@ void IEC62056Component::loop() {
       if (receive_frame_() >= 1) {
         if (PPP == in_buf_[0]) {
           ESP_LOGD(TAG, "Meter asks for password");
-          set_next_state_(WAIT_FOR_PPP_READ_DATA);
+          set_next_state_(SEND_PASSWORD);
         } else {
           ESP_LOGD(TAG, "No PPP. Got 0x%02x", in_buf_[0]);
           retry_or_sleep_();
@@ -516,6 +516,7 @@ void IEC62056Component::loop() {
     case WAIT_FOR_ACK:
       report_state_();
 
+      receive_frame_()
       if (receive_frame_() >= 1) {
         if (ACK == in_buf_[0]) {
           ESP_LOGD(TAG, "Meter accepted password");
