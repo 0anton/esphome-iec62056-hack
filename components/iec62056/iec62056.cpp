@@ -266,6 +266,7 @@ void IEC62056Component::loop() {
 
   const uint8_t id_request[5] = {'/', '?', '!', '\r', '\n'};
   const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
+  const uint8_t set_password[16] = {0x01, "P1", 0x02, "(00000000)",  0x03, 0x61};
   const uint32_t now = millis();
 
   size_t frame_size;
@@ -491,7 +492,29 @@ void IEC62056Component::loop() {
       }
       break;
 
-    
+    case SEND_PASSWORD:
+       report_state_();
+       data_out_size_ = sizeof(set_password);
+       memcpy(out_buf_, set_password, data_out_size_);
+       send_frame_();
+    break
+
+    case WAIT_FOR_ACK:
+      report_state_();
+
+      if (receive_frame_() >= 1) {
+        if (ACK == in_buf_[0]) {
+          ESP_LOGD(TAG, "Meter accepted password");
+          // set_next_state_(READOUT);
+          retry_or_sleep_();
+        } else {
+          ESP_LOGD(TAG, "Meter rejected password. Got 0x%02x", in_buf_[0]);
+          retry_or_sleep_();
+        }
+      }
+      break;
+
+
     case WAIT_FOR_STX:  // wait for STX
       report_state_();
 
@@ -763,6 +786,9 @@ const char *IEC62056Component::state2txt_(CommState state) {
 
     case PREPARE_ACK:
       return "SET_BAUD_RATE";
+
+    case WAIT_FOR_ACK:
+      return "WAIT_FOR_ACK";
 
     case WAIT_FOR_STX:
       return "WAIT_FOR_STX";
