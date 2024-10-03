@@ -528,17 +528,9 @@ void IEC62056Component::loop() {
        data_out_size_ = sizeof(set_password);
        memcpy(out_buf_, set_password, data_out_size_);
        send_frame_();
-
-       receive_frame_(); // STX
-       receive_frame_(); // (2)
-
-       data_out_size_ = sizeof(readout_energy);
-       memcpy(out_buf_, readout_energy, data_out_size_);
-       send_frame_();
-
        set_next_state_(WAIT_FOR_STX);
-       
     break;
+
 
     case WAIT_FOR_ACK:
       report_state_();
@@ -555,6 +547,36 @@ void IEC62056Component::loop() {
       }
       break;
 
+    case WAIT_FOR_STX2:  // wait for STX
+      report_state_();
+
+      // If the loop is called not very often, data can be overwritten.
+      // In that case just increase UART buffer size
+      if (receive_frame_() >= 1) {
+        if (STX == in_buf_[0]) {
+          ESP_LOGD(TAG, "Meter started readout transmission");
+          set_next_state_(READOUT2);
+        } else {
+          ESP_LOGD(TAG, "No STX. Got 0x%02x", in_buf_[0]);
+          retry_or_sleep_();
+        }
+      }
+      break;
+
+    case READOUT2:
+      report_state_();
+      if (receive_frame_() >= 1) {
+          set_next_state_(ASK_FOR_ENERGY);
+      }
+      break;
+
+    case ASK_FOR_ENERGY:
+       report_state_();
+       data_out_size_ = sizeof(readout_energy);
+       memcpy(out_buf_, readout_energy, data_out_size_);
+       send_frame_();
+       set_next_state_(WAIT_FOR_STX);
+    break;
 
     case WAIT_FOR_STX:  // wait for STX
       report_state_();
@@ -571,6 +593,7 @@ void IEC62056Component::loop() {
         }
       }
       break;
+
 
     case READOUT:
       report_state_();
@@ -851,11 +874,20 @@ const char *IEC62056Component::state2txt_(CommState state) {
     case WAIT_FOR_STX:
       return "WAIT_FOR_STX";
 
+    case WAIT_FOR_STX2:
+      return "WAIT_FOR_STX2";
+
+    case ASK_FOR_ENERGY:
+      return "ASK_FOR_ENERGY";
+
     case WAIT_FOR_PPP:
       return "WAIT_FOR_PPP";
     
     case READOUT:
       return "READOUT";
+
+    case READOUT2:
+      return "READOUT2";
 
     case UPDATE_STATES:
       return "UPDATE_STATES";
