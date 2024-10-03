@@ -12,7 +12,7 @@ namespace iec62056 {
 static const uint8_t ETX = 0x03;
 static const uint8_t STX = 0x02;
 static const uint8_t ACK = 0x06;
-static const uint8_t PPP = 0x01;
+static const uint8_t SOH = 0x01;
 
 static const char *const TAG = "iec62056.component";
 const uint32_t BAUDRATES[] = {300, 600, 1200, 2400, 4800, 9600, 19200};
@@ -265,8 +265,8 @@ void IEC62056Component::loop() {
   static uint32_t new_baudrate;
 
   const uint8_t id_request[5] = {'/', '?', '!', '\r', '\n'};
-  // const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
-  const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x30, 0x0d, 0x0a};
+  const uint8_t set_baud_and_programm[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
+  // const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x30, 0x0d, 0x0a};
   const uint8_t set_password[16] = {0x01, 'P', '1', 0x02, '(', '0', '0', '0', '0', '0', '0', '0', '1', ')', 0x03, 0x61};
   const uint32_t now = millis();
 
@@ -461,8 +461,8 @@ void IEC62056Component::loop() {
       //            identification_to_baud_rate_(baud_rate_char), baud_rate_char);
       // }
 
-      data_out_size_ = sizeof(set_baud);
-      memcpy(out_buf_, set_baud, data_out_size_);
+      data_out_size_ = sizeof(set_baud_and_programm);
+      memcpy(out_buf_, set_baud_and_programm, data_out_size_);
       out_buf_[2] = baud_rate_char;
       send_frame_();
 
@@ -477,13 +477,13 @@ void IEC62056Component::loop() {
     case SET_BAUD_RATE:
       ESP_LOGD(TAG, "Switching to new baud rate %u bps ('%c')", new_baudrate, baud_rate_char);
       update_baudrate_(new_baudrate);
-      set_next_state_(WAIT_FOR_STX);
+      set_next_state_(WAIT_FOR_PPP);
       break;
 
     case WAIT_FOR_PPP:
       report_state_();
       if (receive_frame_() >= 1) {
-        if (PPP == in_buf_[0]) {
+        if (SOH == in_buf_[0]) {
           ESP_LOGD(TAG, "Meter asks for password");
           set_next_state_(WAIT_FOR_PPP_READ_DATA);
         } else {
