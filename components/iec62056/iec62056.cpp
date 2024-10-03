@@ -283,7 +283,8 @@ void IEC62056Component::loop() {
   const uint8_t id_request[5] = {'/', '?', '!', '\r', '\n'};
   const uint8_t set_baud_and_programm[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
   // const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x30, 0x0d, 0x0a};
-  const uint8_t set_password[16] = {0x01, 'P', '1', 0x02, '(', '0', '0', '0', '0', '0', '0', '0', '1', ')', 0x03, 0x61};
+  const uint8_t set_password[16] = {SOH, 'P', '1', STX, '(', '0', '0', '0', '0', '0', '0', '0', '1', ')', ETX, 0x61};
+  const uint8_t readout_energy[16] = {SOH, 'R', '1', STX, '0', 'F', '0', '8', '8', '0', 'F', 'F', '(', ')', ETX, 0x15};
   const uint32_t now = millis();
 
   size_t frame_size;
@@ -522,63 +523,22 @@ void IEC62056Component::loop() {
     }
     break;
 
-case SEND_PASSWORD:
-  report_state_();
-  data_out_size_ = sizeof(set_password);
-  memcpy(out_buf_, set_password, data_out_size_);
-  send_frame_();
+    case SEND_PASSWORD:
+       report_state_();
+       data_out_size_ = sizeof(set_password);
+       memcpy(out_buf_, set_password, data_out_size_);
+       send_frame_();
 
-  // Attempt to receive a response from the meter
-  if ((frame_size = receive_frame_()) >= 1) {
-    // Check if the response starts with STX (Start of Text)
-    if (in_buf_[0] == STX) {
-      ESP_LOGV(TAG, "Meter started readout transmission");
-      // Reset LRC (Longitudinal Redundancy Check) for new data
-      reset_lrc_();
-      update_last_transmission_from_meter_timestamp_();
-      set_next_state_(READOUT);
-    } else {
-      // Handle cases where the meter sends data without STX
-      // Update LRC with the received data
-      update_lrc_(in_buf_, frame_size);
+       receive_frame_(); // STX
+       receive_frame_(); // (2)
 
-      // Null-terminate the data string before the ETX character
-      if (frame_size >= 2) {
-        in_buf_[frame_size - 2] = 0;  // Replace ETX with null terminator
-      } else {
-        in_buf_[frame_size - 1] = 0;  // For safety
-      }
+       data_out_size_ = sizeof(readout_energy);
+       memcpy(out_buf_, readout_energy, data_out_size_);
+       send_frame_();
 
-      ESP_LOGD(TAG, "Data: %s", in_buf_);
-      std::string obis;
-      std::string val1;
-      std::string val2;
-
-      if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
-        ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
-        retry_or_sleep_();
-      } else {
-        ESP_LOGD(TAG, "Received response after password: OBIS='%s', Value1='%s', Value2='%s'",
-                 obis.c_str(), val1.c_str(), val2.c_str());
-
-        // Decide next action based on the received value
-        if (val1 == "2") {
-          // Possibly indicates that the meter is already logged in or another status
-          ESP_LOGD(TAG, "Meter response indicates status '2'. Proceeding to READOUT.");
-          set_next_state_(READOUT);
-        } else {
-          // Handle other possible responses or errors
-          ESP_LOGW(TAG, "Unexpected response after password. Retrying.");
-          retry_or_sleep_();
-        }
-      }
-    }
-  } else {
-    // No response received after sending password
-    ESP_LOGE(TAG, "No response after sending password");
-    retry_or_sleep_();
-  }
-  break;
+       set_next_state_(WAIT_FOR_STX)
+       
+    break;
 
     case WAIT_FOR_ACK:
       report_state_();
