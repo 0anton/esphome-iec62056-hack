@@ -525,8 +525,8 @@ void IEC62056Component::loop() {
 
     case SEND_PASSWORD:
        report_state_();
-       data_out_size_ = sizeof(set_password);
-       memcpy(out_buf_, set_password, data_out_size_);
+       data_out_size_ = sizeof(readout_energy);
+       memcpy(out_buf_, readout_energy, data_out_size_);
        send_frame_();
        set_next_state_(WAIT_FOR_STX2);
     break;
