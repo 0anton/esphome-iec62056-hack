@@ -266,7 +266,7 @@ void IEC62056Component::loop() {
 
   const uint8_t id_request[5] = {'/', '?', '!', '\r', '\n'};
   const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
-  const uint8_t set_password[16] = {0x01, 'P', '1', 0x02, '(', '0', '0', '0', '0', '0', '0', '0', '0', ')', 0x03, 0x60};
+  const uint8_t set_password[16] = {0x01, 'P', '1', 0x02, '(', '0', '0', '0', '0', '0', '0', '0', '0', ')', 0x03, 0x61};
   const uint32_t now = millis();
 
   size_t frame_size;
