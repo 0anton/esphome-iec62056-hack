@@ -477,7 +477,7 @@ void IEC62056Component::loop() {
     case SET_BAUD_RATE:
       ESP_LOGD(TAG, "Switching to new baud rate %u bps ('%c')", new_baudrate, baud_rate_char);
       update_baudrate_(new_baudrate);
-      set_next_state_(WAIT_FOR_PPP);
+      set_next_state_(WAIT_FOR_STX);
       break;
 
     case WAIT_FOR_PPP:
