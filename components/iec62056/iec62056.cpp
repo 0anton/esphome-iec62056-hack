@@ -721,16 +721,24 @@ void IEC62056Component::verify_all_sensors_got_value_() {
   }
 }
 
-// Valid OBIS codes may contain digits and uppercase letters
+// Valid OBIS codes may be empty or may contain digits and uppercase letters
 bool IEC62056Component::validate_obis_(const std::string &obis) {
-  const size_t max_obis_len = 25;  // arbitrary chosen max len
+  const size_t max_obis_len = 25;  // Arbitrary chosen max length
 
+  // Allow empty OBIS codes
+  if (obis.empty()) {
+    return true;
+  }
+
+  // Check if the OBIS code exceeds the maximum allowed length
   if (obis.size() > max_obis_len) {
     return false;
   }
 
+  // Validate each character in the OBIS code
   for (const char &c : obis) {
-    if (!(c == ':' || c == '.' || c == '-' || c == '*' || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z'))) {
+    if (!(c == ':' || c == '.' || c == '-' || c == '*' ||
+          (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z'))) {
       return false;
     }
   }
