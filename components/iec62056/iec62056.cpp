@@ -168,7 +168,7 @@ size_t IEC62056Component::receive_frame_() {
     }
 
     if (STX == in_buf_[data_in_size_ - 1]) {
-      ESP_LOGVV(TAG, "RX: %s", format_hex_pretty(in_buf_, data_in_size_).c_str());
+      ESP_LOGVV(TAG, "RX: %s", format_hex_ascii_pretty(in_buf_, data_in_size_).c_str());
       ESP_LOGV(TAG, "Detected STX");
       reset_lrc_();
       update_last_transmission_from_meter_timestamp_();
@@ -178,7 +178,7 @@ size_t IEC62056Component::receive_frame_() {
     }
 
     if (data_in_size_ >= 2 && '\r' == in_buf_[data_in_size_ - 2] && '\n' == in_buf_[data_in_size_ - 1]) {
-      ESP_LOGVV(TAG, "RX: %s", format_hex_pretty(in_buf_, data_in_size_).c_str());
+      ESP_LOGVV(TAG, "RX: %s", format_hex_ascii_pretty(in_buf_, data_in_size_).c_str());
 
       // check echo
       if (data_in_size_ == data_out_size_ && 0 == memcmp(out_buf_, in_buf_, data_out_size_)) {
