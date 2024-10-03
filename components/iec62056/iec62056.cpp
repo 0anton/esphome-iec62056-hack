@@ -536,7 +536,7 @@ void IEC62056Component::loop() {
        memcpy(out_buf_, readout_energy, data_out_size_);
        send_frame_();
 
-       set_next_state_(WAIT_FOR_STX)
+       set_next_state_(WAIT_FOR_STX);
        
     break;
 
