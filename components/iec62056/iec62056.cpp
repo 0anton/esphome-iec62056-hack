@@ -727,11 +727,13 @@ bool IEC62056Component::validate_obis_(const std::string &obis) {
 
   // Allow empty OBIS codes
   if (obis.empty()) {
+    ESP_LOGVV(TAG, "OBIS code is empty");
     return true;
   }
 
   // Check if the OBIS code exceeds the maximum allowed length
   if (obis.size() > max_obis_len) {
+    ESP_LOGVV(TAG, "OBIS code is too long");
     return false;
   }
 
@@ -739,6 +741,7 @@ bool IEC62056Component::validate_obis_(const std::string &obis) {
   for (const char &c : obis) {
     if (!(c == ':' || c == '.' || c == '-' || c == '*' ||
           (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z'))) {
+      ESP_LOGVV(TAG, "OBIS code has invalid characters");
       return false;
     }
   }
@@ -766,6 +769,7 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
   }
 
   if (!open_bracket || !close_bracket || close_bracket < open_bracket) {
+    ESP_LOGVV(TAG, "Missing expected open and closing bracket");
     return false;
   }
 
