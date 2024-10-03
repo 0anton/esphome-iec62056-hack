@@ -110,7 +110,9 @@ size_t IEC62056Component::receive_frame_() {
 
     // it is not possible to have \r\n and ETX in buffer at one time
     if (data_in_size_ >= 2 && ETX == in_buf_[data_in_size_ - 2]) {
-      ESP_LOGVV(TAG, "RX: %s", format_hex_pretty(in_buf_, data_in_size_).c_str());
+      std::string hex_str = format_hex_pretty(in_buf_, data_in_size_);
+      std::string ascii_str = format_ascii_pretty(in_buf_, data_in_size_);
+      ESP_LOGVV(TAG, "RX: %s |%s|", hex_str.c_str(), ascii_str.c_str());
       ESP_LOGV(TAG, "Detected ETX");
 
       readout_lrc_ = in_buf_[data_in_size_ - 1];
