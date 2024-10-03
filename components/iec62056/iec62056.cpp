@@ -449,16 +449,16 @@ void IEC62056Component::loop() {
         baud_rate_char = baud_rate_identification_;
       }
 
-      if (retry_counter_ > 0) {  // decrease baud rate for retry
-        baud_rate_char -= retry_counter_;
-        if (mode_ == PROTOCOL_MODE_B && baud_rate_char < PROTO_B_RANGE_BEGIN) {
-          baud_rate_char = PROTO_B_RANGE_BEGIN;
-        } else if (baud_rate_char < PROTO_C_RANGE_BEGIN) {
-          baud_rate_char = PROTO_C_RANGE_BEGIN;
-        }
-        ESP_LOGD(TAG, "Decreased baud rate for retry %u to: %d bps ('%c').", retry_counter_,
-                 identification_to_baud_rate_(baud_rate_char), baud_rate_char);
-      }
+      // if (retry_counter_ > 0) {  // decrease baud rate for retry
+      //   baud_rate_char -= retry_counter_;
+      //   if (mode_ == PROTOCOL_MODE_B && baud_rate_char < PROTO_B_RANGE_BEGIN) {
+      //     baud_rate_char = PROTO_B_RANGE_BEGIN;
+      //   } else if (baud_rate_char < PROTO_C_RANGE_BEGIN) {
+      //     baud_rate_char = PROTO_C_RANGE_BEGIN;
+      //   }
+      //   ESP_LOGD(TAG, "Decreased baud rate for retry %u to: %d bps ('%c').", retry_counter_,
+      //            identification_to_baud_rate_(baud_rate_char), baud_rate_char);
+      // }
 
       data_out_size_ = sizeof(set_baud);
       memcpy(out_buf_, set_baud, data_out_size_);
