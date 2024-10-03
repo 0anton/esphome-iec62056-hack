@@ -522,13 +522,63 @@ void IEC62056Component::loop() {
     }
     break;
 
-    case SEND_PASSWORD:
-       report_state_();
-       data_out_size_ = sizeof(set_password);
-       memcpy(out_buf_, set_password, data_out_size_);
-       send_frame_();
-       set_next_state_(WAIT_FOR_STX);
-    break;
+case SEND_PASSWORD:
+  report_state_();
+  data_out_size_ = sizeof(set_password);
+  memcpy(out_buf_, set_password, data_out_size_);
+  send_frame_();
+
+  // Attempt to receive a response from the meter
+  if ((frame_size = receive_frame_()) >= 1) {
+    // Check if the response starts with STX (Start of Text)
+    if (in_buf_[0] == STX) {
+      ESP_LOGV(TAG, "Meter started readout transmission");
+      // Reset LRC (Longitudinal Redundancy Check) for new data
+      reset_lrc_();
+      update_last_transmission_from_meter_timestamp_();
+      set_next_state_(READOUT);
+    } else {
+      // Handle cases where the meter sends data without STX
+      // Update LRC with the received data
+      update_lrc_(in_buf_, frame_size);
+
+      // Null-terminate the data string before the ETX character
+      if (frame_size >= 2) {
+        in_buf_[frame_size - 2] = 0;  // Replace ETX with null terminator
+      } else {
+        in_buf_[frame_size - 1] = 0;  // For safety
+      }
+
+      ESP_LOGD(TAG, "Data: %s", in_buf_);
+      std::string obis;
+      std::string val1;
+      std::string val2;
+
+      if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
+        ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
+        retry_or_sleep_();
+      } else {
+        ESP_LOGD(TAG, "Received response after password: OBIS='%s', Value1='%s', Value2='%s'",
+                 obis.c_str(), val1.c_str(), val2.c_str());
+
+        // Decide next action based on the received value
+        if (val1 == "2") {
+          // Possibly indicates that the meter is already logged in or another status
+          ESP_LOGD(TAG, "Meter response indicates status '2'. Proceeding to READOUT.");
+          set_next_state_(READOUT);
+        } else {
+          // Handle other possible responses or errors
+          ESP_LOGW(TAG, "Unexpected response after password. Retrying.");
+          retry_or_sleep_();
+        }
+      }
+    }
+  } else {
+    // No response received after sending password
+    ESP_LOGE(TAG, "No response after sending password");
+    retry_or_sleep_();
+  }
+  break;
 
     case WAIT_FOR_ACK:
       report_state_();
@@ -562,65 +612,62 @@ void IEC62056Component::loop() {
       }
       break;
 
-case READOUT:
-  report_state_();
+    case READOUT:
+      report_state_();
 
-  if ((frame_size = receive_frame_())) {
-    // Check if ETX is at the expected position (second-to-last byte)
-    if (frame_size >= 2 && in_buf_[frame_size - 2] == ETX) {
-      ESP_LOGD(TAG, "Detected ETX at the end of data");
-      ESP_LOGD(TAG, "Total connection time: %u ms", millis() - retry_connection_start_timestamp_);
-      // Include ETX in LRC calculation if required
-      lrc_ ^= ETX;
+      if ((frame_size = receive_frame_())) {
+        // ETX is the first byte (the way receive_frame_() works and \r\n in data)
+        if (in_buf_[0] == ETX) {
+          ESP_LOGD(TAG, "Total connection time: %u ms", millis() - retry_connection_start_timestamp_);
+          // include ETX (but exclude STX)
+          lrc_ ^= ETX;  // faster than update_lrc_(in_buf_,1);
+          bool bcc_failed = false;
+          if (lrc_ == readout_lrc_) {
+            ESP_LOGD(TAG, "BCC verification is OK");
+          } else {
+            ESP_LOGE(TAG, "BCC verification failed. Expected 0x%02x, got 0x%02x", lrc_, readout_lrc_);
+            bcc_failed = true;
+          }
 
-      // Verify BCC
-      bool bcc_failed = false;
-      if (lrc_ == readout_lrc_) {
-        ESP_LOGD(TAG, "BCC verification is OK");
-      } else {
-        ESP_LOGE(TAG, "BCC verification failed. Expected 0x%02x, got 0x%02x", lrc_, readout_lrc_);
-        bcc_failed = true;
+          connection_status_(false);
+
+          if (bcc_failed) {
+            retry_or_sleep_();
+          } else {
+            verify_all_sensors_got_value_();
+            ESP_LOGD(TAG, "Start of sensor update");
+            set_next_state_(UPDATE_STATES);
+            sensors_iterator_ = sensors_.begin();
+          }
+
+        } else {
+          // parse data
+          update_lrc_(in_buf_, frame_size);
+
+          in_buf_[frame_size - 2] = 0;
+          ESP_LOGD(TAG, "Data: %s", in_buf_);
+          std::string obis;
+          std::string val1;
+          std::string val2;
+
+          if ('!' == in_buf_[0]) {
+            ESP_LOGV(TAG, "Detected end of readout record");
+            break;
+          }
+
+          if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
+            ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
+            break;
+          }
+
+          // Update all matching sensors
+          auto range = sensors_.equal_range(obis);
+          for (auto it = range.first; it != range.second; ++it) {
+            set_sensor_value_(it, val1.c_str(), val2.c_str());
+          }
+        }
       }
-
-      connection_status_(false);
-
-      if (bcc_failed) {
-        retry_or_sleep_();
-      } else {
-        verify_all_sensors_got_value_();
-        ESP_LOGD(TAG, "Start of sensor update");
-        set_next_state_(UPDATE_STATES);
-        sensors_iterator_ = sensors_.begin();
-      }
-
-    } else {
-      // Parse data
-      update_lrc_(in_buf_, frame_size);
-
-      in_buf_[frame_size - 2] = 0;  // Null-terminate the data string
-      ESP_LOGD(TAG, "Data: %s", in_buf_);
-      std::string obis;
-      std::string val1;
-      std::string val2;
-
-      if ('!' == in_buf_[0]) {
-        ESP_LOGV(TAG, "Detected end of readout record");
-        break;
-      }
-
-      if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
-        ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
-        break;
-      }
-
-      // Update all matching sensors
-      auto range = sensors_.equal_range(obis);
-      for (auto it = range.first; it != range.second; ++it) {
-        set_sensor_value_(it, val1.c_str(), val2.c_str());
-      }
-    }
-  }
-  break;
+      break;
 
     case UPDATE_STATES:
       report_state_();
