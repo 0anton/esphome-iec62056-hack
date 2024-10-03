@@ -756,7 +756,7 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
   const char *close_bracket2 = nullptr;
 
   const char *p = line;
-  while (*p++) {
+  while (*p) {
     if ('(' == *p && !open_bracket) {
       open_bracket = p;
     } else if (')' == *p && !close_bracket) {
@@ -766,6 +766,7 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
     } else if (')' == *p && !close_bracket2) {
       close_bracket2 = p;
     }
+    p++;  // Increment pointer after processing the character
   }
 
   if (!open_bracket || !close_bracket || close_bracket < open_bracket) {
@@ -776,7 +777,7 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
   out_obis.assign(line, open_bracket - line);
   out_value1.assign(open_bracket + 1, close_bracket - open_bracket - 1);
 
-  if (!(!open_bracket2 || !close_bracket2 || close_bracket2 < open_bracket2)) {
+  if (open_bracket2 && close_bracket2 && close_bracket2 > open_bracket2) {
     out_value2.assign(open_bracket2 + 1, close_bracket2 - open_bracket2 - 1);
   } else {
     out_value2.erase();
@@ -784,6 +785,7 @@ bool IEC62056Component::parse_line_(const char *line, std::string &out_obis, std
 
   return validate_obis_(out_obis);
 }
+
 
 void IEC62056Component::clear_uart_input_buffer_() {
   int available = this->available();
