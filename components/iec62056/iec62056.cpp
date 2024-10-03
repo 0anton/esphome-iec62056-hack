@@ -562,62 +562,65 @@ void IEC62056Component::loop() {
       }
       break;
 
-    case READOUT:
-      report_state_();
+case READOUT:
+  report_state_();
 
-      if ((frame_size = receive_frame_())) {
-        // ETX is the first byte (the way receive_frame_() works and \r\n in data)
-        if (in_buf_[0] == ETX) {
-          ESP_LOGD(TAG, "Total connection time: %u ms", millis() - retry_connection_start_timestamp_);
-          // include ETX (but exclude STX)
-          lrc_ ^= ETX;  // faster than update_lrc_(in_buf_,1);
-          bool bcc_failed = false;
-          if (lrc_ == readout_lrc_) {
-            ESP_LOGD(TAG, "BCC verification is OK");
-          } else {
-            ESP_LOGE(TAG, "BCC verification failed. Expected 0x%02x, got 0x%02x", lrc_, readout_lrc_);
-            bcc_failed = true;
-          }
+  if ((frame_size = receive_frame_())) {
+    // Check if ETX is at the expected position (second-to-last byte)
+    if (frame_size >= 2 && in_buf_[frame_size - 2] == ETX) {
+      ESP_LOGD(TAG, "Detected ETX at the end of data");
+      ESP_LOGD(TAG, "Total connection time: %u ms", millis() - retry_connection_start_timestamp_);
+      // Include ETX in LRC calculation if required
+      lrc_ ^= ETX;
 
-          connection_status_(false);
-
-          if (bcc_failed) {
-            retry_or_sleep_();
-          } else {
-            verify_all_sensors_got_value_();
-            ESP_LOGD(TAG, "Start of sensor update");
-            set_next_state_(UPDATE_STATES);
-            sensors_iterator_ = sensors_.begin();
-          }
-
-        } else {
-          // parse data
-          update_lrc_(in_buf_, frame_size);
-
-          in_buf_[frame_size - 2] = 0;
-          ESP_LOGD(TAG, "Data: %s", in_buf_);
-          std::string obis;
-          std::string val1;
-          std::string val2;
-
-          if ('!' == in_buf_[0]) {
-            ESP_LOGV(TAG, "Detected end of readout record");
-            break;
-          }
-
-          if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
-            ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
-            break;
-          }
-
-          // Update all matching sensors
-          auto range = sensors_.equal_range(obis);
-          for (auto it = range.first; it != range.second; ++it) {
-            set_sensor_value_(it, val1.c_str(), val2.c_str());
-          }
-        }
+      // Verify BCC
+      bool bcc_failed = false;
+      if (lrc_ == readout_lrc_) {
+        ESP_LOGD(TAG, "BCC verification is OK");
+      } else {
+        ESP_LOGE(TAG, "BCC verification failed. Expected 0x%02x, got 0x%02x", lrc_, readout_lrc_);
+        bcc_failed = true;
       }
-      break;
+
+      connection_status_(false);
+
+      if (bcc_failed) {
+        retry_or_sleep_();
+      } else {
+        verify_all_sensors_got_value_();
+        ESP_LOGD(TAG, "Start of sensor update");
+        set_next_state_(UPDATE_STATES);
+        sensors_iterator_ = sensors_.begin();
+      }
+
+    } else {
+      // Parse data
+      update_lrc_(in_buf_, frame_size);
+
+      in_buf_[frame_size - 2] = 0;  // Null-terminate the data string
+      ESP_LOGD(TAG, "Data: %s", in_buf_);
+      std::string obis;
+      std::string val1;
+      std::string val2;
+
+      if ('!' == in_buf_[0]) {
+        ESP_LOGV(TAG, "Detected end of readout record");
+        break;
+      }
+
+      if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
+        ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
+        break;
+      }
+
+      // Update all matching sensors
+      auto range = sensors_.equal_range(obis);
+      for (auto it = range.first; it != range.second; ++it) {
+        set_sensor_value_(it, val1.c_str(), val2.c_str());
+      }
+    }
+  }
+  break;
 
     case UPDATE_STATES:
       report_state_();
