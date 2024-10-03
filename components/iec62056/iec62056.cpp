@@ -511,7 +511,7 @@ void IEC62056Component::loop() {
        data_out_size_ = sizeof(set_password);
        memcpy(out_buf_, set_password, data_out_size_);
        send_frame_();
-       set_next_state_(WAIT_FOR_ACK);
+       set_next_state_(WAIT_FOR_STX);
     break;
 
     case WAIT_FOR_ACK:
