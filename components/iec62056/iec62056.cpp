@@ -88,14 +88,16 @@ std::string format_ascii_pretty(const uint8_t *data, size_t length) {
 }
 
 std::string format_hex_ascii_pretty(const uint8_t *data, size_t length) {
-  std::stringstream ss_hex;
+  std::string hex_str;
   std::string ascii_str;
 
   for (size_t i = 0; i < length; ++i) {
     // Append hex representation
     if (i > 0)
-      ss_hex << '.';
-    ss_hex << std::uppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i]);
+      hex_str += '.';
+    char buf[4]; // Enough for "FF\0"
+    snprintf(buf, sizeof(buf), "%02X", data[i]);
+    hex_str += buf;
 
     // Build ASCII representation
     char c = static_cast<char>(data[i]);
@@ -107,9 +109,9 @@ std::string format_hex_ascii_pretty(const uint8_t *data, size_t length) {
   }
 
   // Build the final string
-  std::stringstream ss_final;
-  ss_final << ss_hex.str() << " (" << length << ") |" << ascii_str << "|";
-  return ss_final.str();
+  char final_buf[512]; // Adjust size as needed
+  snprintf(final_buf, sizeof(final_buf), "%s (%u) |%s|", hex_str.c_str(), (unsigned int)length, ascii_str.c_str());
+  return std::string(final_buf);
 }
 
 void IEC62056Component::send_frame_() {
