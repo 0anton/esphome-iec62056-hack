@@ -41,22 +41,6 @@ enum CommState {
 /// @brief Protocol types
 enum ProtocolMode { PROTOCOL_MODE_A = 'A', PROTOCOL_MODE_B = 'B', PROTOCOL_MODE_C = 'C', PROTOCOL_MODE_D = 'D' };
 
-#include <cctype> // For isprint
-
-std::string format_ascii_pretty(const uint8_t *data, size_t length) {
-  std::string ascii_str;
-  for (size_t i = 0; i < length; ++i) {
-    char c = static_cast<char>(data[i]);
-    if (std::isprint(static_cast<unsigned char>(c))) {
-      ascii_str += c;
-    } else {
-      ascii_str += '.';
-    }
-  }
-  return ascii_str;
-}
-
-
 /// @brief Implements support for IEC 62056-21 meters.
 class IEC62056Component : public Component, public uart::UARTDevice {
  public:

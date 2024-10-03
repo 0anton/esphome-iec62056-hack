@@ -79,6 +79,20 @@ void IEC62056Component::send_frame_() {
   ESP_LOGVV(TAG, "TX: %s", format_hex_pretty(out_buf_, data_out_size_).c_str());
 }
 
+std::string format_ascii_pretty(const uint8_t *data, size_t length) {
+  std::string ascii_str;
+  for (size_t i = 0; i < length; ++i) {
+    char c = static_cast<char>(data[i]);
+    if (std::isprint(static_cast<unsigned char>(c))) {
+      ascii_str += c;
+    } else {
+      ascii_str += '.';
+    }
+  }
+  return ascii_str;
+}
+
+
 size_t IEC62056Component::receive_frame_() {
   const uint32_t max_while_ms = 15;
   size_t ret_val;
