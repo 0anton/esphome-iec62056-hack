@@ -151,6 +151,16 @@ size_t IEC62056Component::receive_frame_() {
       }
     }
 
+    // Check for ACK
+    if (in_buf_[data_in_size_ - 1] == ACK) {
+      ESP_LOGVV(TAG, "RX: %s", format_hex_ascii_pretty(in_buf_, data_in_size_).c_str());
+      ESP_LOGV(TAG, "Detected ACK");
+      update_last_transmission_from_meter_timestamp_();
+      ret_val = data_in_size_;
+      data_in_size_ = 0;
+      return ret_val;
+    }
+
     // it is not possible to have \r\n and ETX in buffer at one time
     if (data_in_size_ >= 2 && ETX == in_buf_[data_in_size_ - 2]) {
       std::string hex_str = format_hex_pretty(in_buf_, data_in_size_);
@@ -557,7 +567,7 @@ void IEC62056Component::loop() {
        data_out_size_ = sizeof(set_password);
        memcpy(out_buf_, set_password, data_out_size_);
        send_frame_();
-       set_next_state_(WAIT_FOR_STX2);
+       set_next_state_(WAIT_FOR_ACK);
     break;
 
 
@@ -567,11 +577,9 @@ void IEC62056Component::loop() {
       if (receive_frame_() >= 1) {
         if (ACK == in_buf_[0]) {
           ESP_LOGD(TAG, "Meter accepted password");
-          // set_next_state_(READOUT);
-          retry_or_sleep_();
+          set_next_state_(ASK_FOR_ENERGY);
         } else {
           ESP_LOGD(TAG, "Meter rejected password. Got 0x%02x", in_buf_[0]);
-          retry_or_sleep_();
         }
       }
       break;
