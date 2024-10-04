@@ -539,7 +539,7 @@ void IEC62056Component::loop() {
     case WAIT_FOR_PPP:
       report_state_();
       if (receive_frame_() >= 1) {
-        if (SOH == in_buf_[0]) {
+        if (SOH == in_buf_[0]) {  // RX: 01.50.30.02 (4) |.P0.|
           ESP_LOGD(TAG, "Meter asks for password");
           set_next_state_(WAIT_FOR_PPP_READ_DATA);
         } else {
@@ -552,7 +552,7 @@ void IEC62056Component::loop() {
     case WAIT_FOR_PPP_READ_DATA:
       report_state_();
       if (receive_frame_() >= 1) {
-        if ('(' == in_buf_[0]) {
+        if ('(' == in_buf_[0]) { // RX: .P1.(00000000).a
         ESP_LOGD(TAG, "Meter asks for password (data)");
         set_next_state_(SEND_PASSWORD);
       } else {
