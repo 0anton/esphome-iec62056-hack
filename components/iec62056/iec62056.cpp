@@ -312,7 +312,7 @@ void IEC62056Component::loop() {
   const uint8_t id_request[5] = {'/', '?', '!', '\r', '\n'};
   const uint8_t set_baud_and_programm[6] = {ACK, 0x30, 0x30, 0x31, 0x0d, 0x0a};
   // const uint8_t set_baud[6] = {ACK, 0x30, 0x30, 0x30, 0x0d, 0x0a};
-  const uint8_t set_password[16] = {SOH, 'P', '1', STX, '(', '0', '0', '0', '0', '0', '0', '0', '1', ')', ETX, 0x61};
+  const uint8_t set_password[16] = {SOH, 'P', '1', STX, '(', '0', '0', '0', '0', '0', '0', '0', '0', ')', ETX, 0x61};
   const uint8_t readout_energy[16] = {SOH, 'R', '1', STX, '0', 'F', '0', '8', '8', '0', 'F', 'F', '(', ')', ETX, 0x15};
   const uint32_t now = millis();
 
