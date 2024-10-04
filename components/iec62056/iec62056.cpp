@@ -346,7 +346,7 @@ void IEC62056Component::build_readout_command_(const char *obis_code) {
 
   // Calculate BCC (Block Check Character)
   uint8_t bcc = 0x00;
-  for (size_t i = 0; i < data_out_size_; ++i) {
+  for (size_t i = 1; i < data_out_size_; ++i) {
     bcc ^= out_buf_[i];
   }
   // Append BCC
