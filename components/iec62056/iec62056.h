@@ -71,6 +71,8 @@ class IEC62056Component : public Component, public uart::UARTDevice {
   void set_mode_d(bool flag) { force_mode_d_ = flag; }
 
  protected:
+  void build_readout_command_(const char *obis_code);
+  // Build the readout command for the given OBIS code
   bool parse_line_(const char *line, std::string &out_obis, std::string &out_value1, std::string &out_value2);
   /// Reset values for all sensors.
   void reset_all_sensors_();
