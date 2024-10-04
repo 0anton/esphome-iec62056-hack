@@ -671,13 +671,15 @@ case READOUT:
       connection_status_(false);
 
       if (bcc_failed) {
-        retry_or_sleep_();
-      } else {
-        verify_all_sensors_got_value_();
-        ESP_LOGD(TAG, "Start of sensor update");
-        set_next_state_(UPDATE_STATES);
-        sensors_iterator_ = sensors_.begin();
-      }
+        ESP_LOGD(TAG, "BCC check has failed, but will carry on with the sensors update for now...");
+        // retry_or_sleep_();
+      } 
+
+      verify_all_sensors_got_value_();
+      ESP_LOGD(TAG, "Start of sensor update");
+      set_next_state_(UPDATE_STATES);
+      sensors_iterator_ = sensors_.begin();
+
     } else {
       // Parse data (in case of multiple data frames)
       update_lrc_(in_buf_, frame_size);
