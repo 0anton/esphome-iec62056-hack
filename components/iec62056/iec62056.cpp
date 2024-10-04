@@ -325,6 +325,8 @@ void IEC62056Component::loop() {
   const uint8_t set_password[16] = {SOH, 'P', '1', STX, '(', '0', '0', '0', '0', '0', '0', '0', '0', ')', ETX, 0x61};
   const uint8_t readout_energy[16] = {SOH, 'R', '1', STX, '0', 'F', '0', '8', '8', '0', 'F', 'F', '(', ')', ETX, 0x15};
   const uint32_t now = millis();
+  const uint8_t expected_password_request_prolog[] = {SOH, 'P', '0', STX};
+  const size_t expected_password_request_prolog_length = sizeof(expected_password_request_prolog);
 
   size_t frame_size;
 
@@ -533,21 +535,27 @@ void IEC62056Component::loop() {
     case SET_BAUD_RATE:
       ESP_LOGD(TAG, "Switching to new baud rate %u bps ('%c')", new_baudrate, baud_rate_char);
       update_baudrate_(new_baudrate);
-      set_next_state_(WAIT_FOR_PPP);
+      set_next_state_(WAIT_FOR_PASSWORD_REQUEST_PROLOG);
       break;
 
-    case WAIT_FOR_PPP:
-      report_state_();
-      if (receive_frame_() >= 1) {
-        if (SOH == in_buf_[0]) {
-          ESP_LOGD(TAG, "Meter asks for password");
-          set_next_state_(WAIT_FOR_PPP_READ_DATA);
-        } else {
-          ESP_LOGD(TAG, "No PPP. Got 0x%02x", in_buf_[0]);
-          retry_or_sleep_();
-        }
+  case WAIT_FOR_PASSWORD_REQUEST_PROLOG:
+    report_state_();
+    size_t frame_size;
+    if ((frame_size = receive_frame_()) >= expected_password_request_prolog_length) {
+      // Compare the received frame with the expected PPP sequence
+      if (memcmp(in_buf_, expected_password_request_prolog, expected_password_request_prolog_length) == 0) {
+        ESP_LOGD(TAG, "Meter asks for password");
+        set_next_state_(WAIT_FOR_PPP_READ_DATA);
+      } else {
+        ESP_LOGD(TAG, "Unexpected PPP response:");
+        ESP_LOGD(TAG, "RX: %s", format_hex_ascii_pretty(in_buf_, frame_size).c_str());
+        retry_or_sleep_();
       }
-      break;
+    } else {
+      ESP_LOGD(TAG, "Incomplete PPP frame. Expected %u bytes, got %u", (unsigned int)expected_password_request_prolog_length, (unsigned int)frame_size);
+      retry_or_sleep_();
+    }
+    break;
 
     case WAIT_FOR_PPP_READ_DATA:
       report_state_();
@@ -917,8 +925,8 @@ const char *IEC62056Component::state2txt_(CommState state) {
     case ASK_FOR_ENERGY:
       return "ASK_FOR_ENERGY";
 
-    case WAIT_FOR_PPP:
-      return "WAIT_FOR_PPP";
+    case WAIT_FOR_PASSWORD_REQUEST_PROLOG:
+      return "WAIT_FOR_PASSWORD_REQUEST_PROLOG";
     
     case READOUT:
       return "READOUT";
