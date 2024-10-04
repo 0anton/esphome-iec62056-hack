@@ -19,7 +19,18 @@ const uint32_t BAUDRATES[] = {300, 600, 1200, 2400, 4800, 9600, 19200};
 #define MAX_BAUDRATE (BAUDRATES[sizeof(BAUDRATES) / sizeof(uint32_t) - 1])
 #define PROTO_B_MIN_BAUDRATE (BAUDRATES[1])
 
-IEC62056Component::IEC62056Component() { state_ = INFINITE_WAIT; }
+const char *IEC62056Component::obis_codes_[] = {
+    "100700FF",
+    "380700FF",
+    "240700FF",
+    "4C0700FF"
+};
+const size_t IEC62056Component::num_obis_codes_ = sizeof(IEC62056Component::obis_codes_) / sizeof(IEC62056Component::obis_codes_[0]);
+
+
+IEC62056Component::IEC62056Component() : current_obis_index_(0) {
+  state_ = INFINITE_WAIT;
+}
 
 void IEC62056Component::setup() {
   ESP_LOGCONFIG(TAG, "Setting up iec62056 component...");
@@ -309,6 +320,40 @@ void IEC62056Component::parse_id_(const char *packet) {
   }
 }
 
+void IEC62056Component::build_readout_command_(const char *obis_code) {
+  // Build the readout command for the given OBIS code
+  // Format: SOH R1 STX [OBIS code] ( ) ETX BCC
+
+  // Start with SOH, 'R', '1', STX
+  data_out_size_ = 0;
+  out_buf_[data_out_size_++] = SOH;
+  out_buf_[data_out_size_++] = 'R';
+  out_buf_[data_out_size_++] = '1';
+  out_buf_[data_out_size_++] = STX;
+
+  // Copy OBIS code characters
+  size_t obis_len = strlen(obis_code);
+  for (size_t i = 0; i < obis_len; ++i) {
+    out_buf_[data_out_size_++] = obis_code[i];
+  }
+
+  // Add '(' and ')'
+  out_buf_[data_out_size_++] = '(';
+  out_buf_[data_out_size_++] = ')';
+
+  // Add ETX
+  out_buf_[data_out_size_++] = ETX;
+
+  // Calculate BCC (Block Check Character)
+  uint8_t bcc = 0x00;
+  for (size_t i = 0; i < data_out_size_; ++i) {
+    bcc ^= out_buf_[i];
+  }
+  // Append BCC
+  out_buf_[data_out_size_++] = bcc;
+}
+
+
 void IEC62056Component::update_baudrate_(uint32_t baudrate) {
   ESP_LOGV(TAG, "Baudrate set to: %u bps", baudrate);
   iuart_->update_baudrate(baudrate);
@@ -414,6 +459,7 @@ void IEC62056Component::loop() {
 
     case BEGIN:
       report_state_();
+      current_obis_index_ = 0;  // Reset index at the beginning
 
       update_connection_start_timestamp_();
       connection_status_(true);
@@ -608,12 +654,11 @@ void IEC62056Component::loop() {
       break;
 
     case ASK_FOR_ENERGY:
-       report_state_();
-       data_out_size_ = sizeof(readout_energy);
-       memcpy(out_buf_, readout_energy, data_out_size_);
-       send_frame_();
-       set_next_state_(WAIT_FOR_STX);
-    break;
+      report_state_();
+      build_readout_command_(obis_codes_[current_obis_index_]);  // Build command for current OBIS code
+      send_frame_();
+      set_next_state_(WAIT_FOR_STX);
+      break;
 
     case WAIT_FOR_STX:  // wait for STX
       report_state_();
@@ -632,77 +677,87 @@ void IEC62056Component::loop() {
       break;
 
 
-case READOUT:
-  report_state_();
+    case READOUT:
+      report_state_();
 
-  if ((frame_size = receive_frame_())) {
-    // Check if ETX is at the end of the frame
-    if (frame_size >= 2 && in_buf_[frame_size - 2] == ETX) {
-      ESP_LOGD(TAG, "Detected ETX at the end of data");
-      ESP_LOGD(TAG, "Total connection time: %u ms", millis() - retry_connection_start_timestamp_);
-      // Include ETX in LRC calculation
-      lrc_ ^= ETX;
-      // Verify BCC
-      bool bcc_failed = false;
-      if (lrc_ == readout_lrc_) {
-        ESP_LOGD(TAG, "BCC verification is OK");
-      } else {
-        ESP_LOGE(TAG, "BCC verification failed. Expected 0x%02x, got 0x%02x", lrc_, readout_lrc_);
-        bcc_failed = true;
-      }
+      if ((frame_size = receive_frame_())) {
+        // Check if ETX is at the end of the frame
+        if (frame_size >= 2 && in_buf_[frame_size - 2] == ETX) {
+          ESP_LOGD(TAG, "Detected ETX at the end of data");
+          ESP_LOGD(TAG, "Total connection time: %u ms", millis() - retry_connection_start_timestamp_);
 
-      // Process the data before proceeding
-      in_buf_[frame_size - 2] = 0;  // Null-terminate before ETX
-      ESP_LOGD(TAG, "Data: %s", in_buf_);
-      std::string obis;
-      std::string val1;
-      std::string val2;
+          // Reset lrc_
+          lrc_ = 0x00;
+          // Update lrc_ over data bytes including ETX, exclude BCC
+          update_lrc_(in_buf_, frame_size - 1);  // Exclude BCC byte
 
-      if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
-        ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
-      } else {
-        // Update all matching sensors
-        auto range = sensors_.equal_range(obis);
-        for (auto it = range.first; it != range.second; ++it) {
-          set_sensor_value_(it, val1.c_str(), val2.c_str());
+          // Verify BCC
+          bool bcc_failed = false;
+          if (lrc_ == readout_lrc_) {
+            ESP_LOGD(TAG, "BCC verification is OK");
+          } else {
+            ESP_LOGE(TAG, "BCC verification failed. Expected 0x%02x, got 0x%02x", lrc_, readout_lrc_);
+            bcc_failed = true;
+          }
+
+          // Process the data before proceeding
+          in_buf_[frame_size - 2] = 0;  // Null-terminate before ETX
+          ESP_LOGD(TAG, "Data: %s", in_buf_);
+          std::string obis;
+          std::string val1;
+          std::string val2;
+
+          if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
+            ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
+          } else {
+            // Update all matching sensors
+            auto range = sensors_.equal_range(obis);
+            for (auto it = range.first; it != range.second; ++it) {
+              set_sensor_value_(it, val1.c_str(), val2.c_str());
+            }
+          }
+
+          connection_status_(false);
+
+          if (bcc_failed) {
+            ESP_LOGD(TAG, "BCC check has failed, but will carry on with the sensors update for now...");
+            // Handle BCC failure if necessary
+          }
+
+          // Move to the next OBIS code or proceed to updating sensors
+          if (++current_obis_index_ < num_obis_codes_) {
+            // There are more OBIS codes to read
+            set_next_state_(ASK_FOR_ENERGY);
+          } else {
+            // All OBIS codes have been read
+            verify_all_sensors_got_value_();
+            ESP_LOGD(TAG, "Start of sensor update");
+            set_next_state_(UPDATE_STATES);
+            sensors_iterator_ = sensors_.begin();
+          }
+        } else {
+          // Handle data frames without ETX (if applicable)
+          update_lrc_(in_buf_, frame_size);
+
+          in_buf_[frame_size - 2] = 0;  // Null-terminate the data string
+          ESP_LOGD(TAG, "Data: %s", in_buf_);
+          std::string obis;
+          std::string val1;
+          std::string val2;
+
+          if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
+            ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
+            break;
+          }
+
+          // Update all matching sensors
+          auto range = sensors_.equal_range(obis);
+          for (auto it = range.first; it != range.second; ++it) {
+            set_sensor_value_(it, val1.c_str(), val2.c_str());
+          }
         }
       }
-
-      connection_status_(false);
-
-      if (bcc_failed) {
-        ESP_LOGD(TAG, "BCC check has failed, but will carry on with the sensors update for now...");
-        // retry_or_sleep_();
-      } 
-
-      verify_all_sensors_got_value_();
-      ESP_LOGD(TAG, "Start of sensor update");
-      set_next_state_(UPDATE_STATES);
-      sensors_iterator_ = sensors_.begin();
-
-    } else {
-      // Parse data (in case of multiple data frames)
-      update_lrc_(in_buf_, frame_size);
-
-      in_buf_[frame_size - 2] = 0;  // Null-terminate the data string
-      ESP_LOGD(TAG, "Data: %s", in_buf_);
-      std::string obis;
-      std::string val1;
-      std::string val2;
-
-      if (!parse_line_((const char *) in_buf_, obis, val1, val2)) {
-        ESP_LOGE(TAG, "Invalid frame format: '%s'", in_buf_);
-        break;
-      }
-
-      // Update all matching sensors
-      auto range = sensors_.equal_range(obis);
-      for (auto it = range.first; it != range.second; ++it) {
-        set_sensor_value_(it, val1.c_str(), val2.c_str());
-      }
-    }
-  }
-  break;
+      break;
 
     case UPDATE_STATES:
       report_state_();

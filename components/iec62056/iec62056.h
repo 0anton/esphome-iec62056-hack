@@ -216,6 +216,14 @@ class IEC62056Component : public Component, public uart::UARTDevice {
   std::unique_ptr<IEC62056UART> iuart_;
   /// @brief Indicates unidirectional communication, mode D
   bool force_mode_d_;
+
+
+private:
+  size_t current_obis_index_;
+  static const char *obis_codes_[];
+  static const size_t num_obis_codes_;
+
+
 };
 
 }  // namespace iec62056
