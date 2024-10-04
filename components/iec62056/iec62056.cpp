@@ -20,10 +20,11 @@ const uint32_t BAUDRATES[] = {300, 600, 1200, 2400, 4800, 9600, 19200};
 #define PROTO_B_MIN_BAUDRATE (BAUDRATES[1])
 
 const char *IEC62056Component::obis_codes_[] = {
-    "100700FF",
-    "380700FF",
-    "240700FF",
-    "4C0700FF"
+    "0F0880FF",
+//    "100700FF",
+//    "380700FF",
+//    "240700FF",
+//    "4C0700FF"
 };
 const size_t IEC62056Component::num_obis_codes_ = sizeof(IEC62056Component::obis_codes_) / sizeof(IEC62056Component::obis_codes_[0]);
 
