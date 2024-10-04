@@ -21,10 +21,28 @@ const uint32_t BAUDRATES[] = {300, 600, 1200, 2400, 4800, 9600, 19200};
 
 const char *IEC62056Component::obis_codes_[] = {
     "0F0880FF",     // Active energy totals
-    "100700FF",   // Current power total
-    "240700FF",   // Current power phase 1
-    "380700FF",   // Current power phase 2
-    "4C0700FF"    // Current power phase 3
+
+    // Power total and per phase
+    "100700FF",    // Current power total
+    "240700FF",    // Current power phase 1
+    "380700FF",    // Current power phase 2
+    "4C0700FF",    // Current power phase 3
+
+    // Temperature
+    "600900FF",
+
+    // Voltage per phase
+    "200700FF",   // Voltage phase 1
+    "340700FF",   // Voltage phase 2
+    "480700FF",   // Voltage phase 3
+
+    // Current per phase
+    "1F0700FF",   // Current phase 1
+    "330700FF",   // Current phase 2
+    "470700FF",   // Current phase 3
+
+    // Active power coefficient
+    "0D07FFFF",
 };
 const size_t IEC62056Component::num_obis_codes_ = sizeof(IEC62056Component::obis_codes_) / sizeof(IEC62056Component::obis_codes_[0]);
 
