@@ -538,8 +538,8 @@ void IEC62056Component::loop() {
 
     case WAIT_FOR_PPP:
       report_state_();
-      if (receive_frame_() >= 1) {
-        if (SOH == in_buf_[0]) {
+      if (receive_frame_() >= 4) {
+        if (SOH == in_buf_[0] && 'P' == in_buf_[1] && '0' == in_buf_[2] && STX == in_buf_[3]) {
           ESP_LOGD(TAG, "Meter asks for password");
           set_next_state_(WAIT_FOR_PPP_READ_DATA);
         } else {
